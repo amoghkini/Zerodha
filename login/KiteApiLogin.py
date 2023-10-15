@@ -1,5 +1,4 @@
-import sys, logging, requests, pyotp, kiteconnect.exceptions as ex
-from enum import StrEnum
+import logging, pyotp, kiteconnect.exceptions as ex
 from kiteconnect import KiteConnect
 
 logging.basicConfig(level=logging.DEBUG)
