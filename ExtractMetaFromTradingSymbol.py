@@ -38,12 +38,18 @@ def extract_metadata_from_tradingsymbol(
         metadata["expiry_type"] = "Monthly"
     else:
         metadata["expiry_type"] = "Weekly"
-        metadata["expiry_dt"] = dt.strptime(
-            metadata["expiry"].replace(
-                metadata["expiry"][2], OND_MAP[metadata["expiry"][2]]
-            ),
-            "%y%b%d",
-        ).date()
+        if metadata["expiry"][2] in OND_MAP:
+            metadata["expiry_dt"] = dt.strptime(
+                metadata["expiry"].replace(
+                    metadata["expiry"][2], OND_MAP[metadata["expiry"][2]]
+                ),
+                "%y%b%d",
+            ).date()
+        else:
+            metadata["expiry_dt"] = dt.strptime(
+                metadata["expiry"],
+                "%y%m%d",
+            ).date()
     metadata.update(
         {
             "expiry": additional_metadata["expiry"].values[0],
