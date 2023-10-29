@@ -85,8 +85,6 @@ def punch_short_straddle_at_best_ask(
         )
     }
     atm_ce_pe_quote = rqs.get(f"{api_url}/quote", params=params).json()["data"]
-    print(atm_ce_pe_quote)
-    print()
     atm_ce_best_ask, atm_pe_best_ask = (
         atm_ce_pe_quote[[i for i in params["i"] if i.endswith("CE")][0]]["depth"][
             "sell"
@@ -116,8 +114,12 @@ def punch_short_straddle_at_best_ask(
         ).json()
         for order_param in order_params
     ]
-    print(ce_order_resp, pe_order_resp)
-    return (
-        ce_order_resp["data"]["order_id"],
-        pe_order_resp["data"]["order_id"],
-    )
+    try:
+        ce_order_id, pe_order_id = (
+            ce_order_resp["data"]["order_id"],
+            pe_order_resp["data"]["order_id"],
+        )
+        print(f"ce_order_id: {ce_order_id}, pe_order_id: {pe_order_id}")
+    except KeyError:
+        print(f"ce_order_raw_response: {ce_order_resp}, pe_orde_raw_response: {pe_order_resp}")
+    return (ce_order_id, pe_order_id)
