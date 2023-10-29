@@ -20,96 +20,88 @@ def punch_short_straddle_at_best_ask(
     )
     rqs.headers.update({"Authorization": f"enctoken {enctoken}"})
     ins_mstr = pd.read_csv(f"{api_url}/instruments")
+    query_expr = "name == @symbol & segment == @opt_segm & exchange == @exch"
     nearest_expiry = (
-        pd.Series(
-            pd.to_datetime(
-                ins_mstr.query(
-                    "name == @symbol & segment == @opt_segm & exchange == @exch"
-                )["expiry"].unique()
-            )
-        )
+        pd.Series(pd.to_datetime(ins_mstr.query(query_expr)["expiry"].unique()))
         .sort_values()
         .dt.strftime("%Y-%m-%d")
         .tolist()[0]
     )
+    query_expr = (
+        "tradingsymbol == @und_symbol & segment == @und_segm & "
+        + "exchange == @und_exch"
+    )
     params = {
-        "i": list(
-            map(
-                lambda x: f"{und_exch}:{x}",
-                ins_mstr.query(
-                    "tradingsymbol == @und_symbol & segment == @und_segm & exchange == @und_exch"
-                )["tradingsymbol"],
-            )
-        )
+        "i": [f"{und_exch}:{ts}" for ts in ins_mstr.query(query_expr)["tradingsymbol"]]
     }
-    ltp = rqs.get(f"{api_url}/quote", params=params).json()["data"][params["i"][0]][
-        "last_price"
-    ]
+    ltp = rqs.get(url=f"{api_url}/quote", params=params)
+    ltp = ltp.json()["data"][params["i"][0]]["last_price"]
+    query_expr = (
+        "name == @symbol & segment == @opt_segm & "
+        + "exchange == @exch & expiry == @nearest_expiry"
+    )
     atm_strike_as_per_spot = min(
-        ins_mstr.query(
-            "name == @symbol & segment == @opt_segm & exchange == @exch & expiry == @nearest_expiry"
-        )["strike"],
-        key=lambda x: abs(x - ltp),
+        ins_mstr.query(query_expr)["strike"], key=lambda x: abs(x - ltp)
+    )
+    query_expr = (
+        "name == @symbol & segment == @opt_segm & exchange =="
+        + "@exch & strike == @atm_strike_as_per_spot & expiry =="
+        + "@nearest_expiry"
     )
     params = {
-        "i": list(
-            map(
-                lambda x: f"{exch}:{x}",
-                ins_mstr.query(
-                    "name == @symbol & segment == @opt_segm & exchange == @exch & strike == @atm_strike_as_per_spot & expiry == @nearest_expiry"
-                )["tradingsymbol"],
-            )
-        )
+        "i": [f"{exch}:{ts}" for ts in ins_mstr.query(query_expr)["tradingsymbol"]]
     }
-    syn_fut = rqs.get(
-        f"{api_url}/quote",
-        params=params,
-    ).json()["data"]
-    syn_fut_price = (
-        atm_strike_as_per_spot
-        + syn_fut[[i for i in params["i"] if i.endswith("CE")][0]]["last_price"]
-        - syn_fut[[i for i in params["i"] if i.endswith("PE")][0]]["last_price"]
+    atm_strikes_quote = rqs.get(f"{api_url}/quote", params=params).json()
+    atm_ce_sym, atm_pe_sym = (
+        params["i"] if params["i"][0].endswith("CE") else params["i"][::-1]
     )
-    atm_strike_as_per_syn_fut = min(
-        ins_mstr.query(
-            "name == @symbol & segment == @opt_segm & exchange == @exch & expiry == @nearest_expiry"
-        )["strike"],
-        key=lambda x: abs(x - syn_fut_price),
+    atm_ce_quote, atm_pe_quote = (
+        atm_strikes_quote["data"][atm_ce_sym],
+        atm_strikes_quote["data"][atm_pe_sym],
     )
-    atm_ce_pe_as_per_syn_fut = ins_mstr.query(
-        "name == @symbol & segment == @opt_segm & exchange == @exch & strike == @atm_strike_as_per_syn_fut & expiry == @nearest_expiry"
+    s_fut_ltp = (
+        atm_strike_as_per_spot + atm_ce_quote["last_price"] - atm_pe_quote["last_price"]
     )
-    lot_size = atm_ce_pe_as_per_syn_fut["lot_size"].values[0]
-    params = {
-        "i": list(
-            map(
-                lambda x: f"{exch}:{x}",
-                atm_ce_pe_as_per_syn_fut["tradingsymbol"],
-            )
-        )
-    }
-    atm_ce_pe_quote = rqs.get(f"{api_url}/quote", params=params).json()["data"]
+    query_expr = (
+        "name == @symbol & segment == @opt_segm & exchange == @exch & "
+        + "expiry == @nearest_expiry"
+    )
+    atm_strike_as_per_s_fut = min(
+        ins_mstr.query(query_expr)["strike"], key=lambda x: abs(x - s_fut_ltp)
+    )
+    query_expr = (
+        "name == @symbol & segment == @opt_segm & exchange == @exch & "
+        + "strike == @atm_strike_as_per_s_fut & expiry == @nearest_expiry"
+    )
+    atm_strikes_ts_as_per_s_fut = ins_mstr.query(query_expr)
+    atm_strikes_trading_symbols = atm_strikes_ts_as_per_s_fut["tradingsymbol"]
+    atm_strikes_lot_size = atm_strikes_ts_as_per_s_fut["lot_size"].values[0]
+    params = {"i": [f"{exch}:{ts}" for ts in atm_strikes_trading_symbols]}
+    atm_strikes_quote = rqs.get(f"{api_url}/quote", params=params).json()
+    atm_ce_sym, atm_pe_sym = (
+        params["i"] if params["i"][0].endswith("CE") else params["i"][::-1]
+    )
+    atm_ce_quote, atm_pe_quote = (
+        atm_strikes_quote["data"][atm_ce_sym],
+        atm_strikes_quote["data"][atm_pe_sym],
+    )
     atm_ce_best_ask, atm_pe_best_ask = (
-        atm_ce_pe_quote[[i for i in params["i"] if i.endswith("CE")][0]]["depth"][
-            "sell"
-        ][0]["price"],
-        atm_ce_pe_quote[[i for i in params["i"] if i.endswith("PE")][0]]["depth"][
-            "sell"
-        ][0]["price"],
+        atm_ce_quote["depth"]["sell"][0]["price"],
+        atm_pe_quote["depth"]["sell"][0]["price"],
     )
     order_params = [
         {
             "exchange": "NFO",
             "tradingsymbol": tradingsymbol,
             "transaction_type": "SELL",
-            "quantity": lot_size * lots,
+            "quantity": atm_strikes_lot_size * lots,
             "product": "NRML",
             "order_type": "LIMIT",
             "price": atm_ce_best_ask
             if tradingsymbol.endswith("CE")
             else atm_pe_best_ask,
         }
-        for tradingsymbol in atm_ce_pe_as_per_syn_fut["tradingsymbol"]
+        for tradingsymbol in atm_strikes_trading_symbols
     ]
     ce_order_resp, pe_order_resp = [
         rqs.post(
@@ -125,6 +117,8 @@ def punch_short_straddle_at_best_ask(
         )
         print(f"ce_order_id: {ce_order_id}, pe_order_id: {pe_order_id}")
         return (ce_order_id, pe_order_id)
-    except KeyError:
-        print(f"ce_order_raw_response: {ce_order_resp}, pe_orde_raw_response: {pe_order_resp}")
+    except (KeyError, TypeError):
+        print(
+            f"ce_order_raw_response: {ce_order_resp}, pe_orde_raw_response: {pe_order_resp}"
+        )
         return (ce_order_resp, pe_order_resp)
