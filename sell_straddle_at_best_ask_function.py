@@ -120,6 +120,7 @@ def punch_short_straddle_at_best_ask(
             pe_order_resp["data"]["order_id"],
         )
         print(f"ce_order_id: {ce_order_id}, pe_order_id: {pe_order_id}")
+        return (ce_order_id, pe_order_id)
     except KeyError:
         print(f"ce_order_raw_response: {ce_order_resp}, pe_orde_raw_response: {pe_order_resp}")
-    return (ce_order_id, pe_order_id)
+        return (ce_order_resp, pe_order_resp)
