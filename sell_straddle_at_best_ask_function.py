@@ -109,13 +109,15 @@ def punch_short_straddle_at_best_ask(
         }
         for tradingsymbol in atm_ce_pe_as_per_syn_fut["tradingsymbol"]
     ]
-    ce_order_id, pe_order_id = [
+    ce_order_resp, pe_order_resp = [
         rqs.post(
             f"{api_url}/orders/regular",
             data=order_param,
-        ).json[
-            "data"
-        ]["order_id"]
+        ).json()
         for order_param in order_params
     ]
-    return ce_order_id, pe_order_id
+    print(ce_order_resp, pe_order_resp)
+    return (
+        ce_order_resp["data"]["order_id"],
+        pe_order_resp["data"]["order_id"],
+    )
