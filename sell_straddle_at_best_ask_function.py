@@ -20,14 +20,18 @@ def punch_short_straddle_at_best_ask(
     )
     rqs.headers.update({"Authorization": f"enctoken {enctoken}"})
     ins_mstr = pd.read_csv(f"{api_url}/instruments")
-    nearest_expiry = pd.Series(
-        pd.to_datetime(
-            ins_mstr.query(
-                "name == @symbol & segment == @opt_segm & exchange == @exch"
-            )["expiry"].unique()
+    nearest_expiry = (
+        pd.Series(
+            pd.to_datetime(
+                ins_mstr.query(
+                    "name == @symbol & segment == @opt_segm & exchange == @exch"
+                )["expiry"].unique()
+            )
         )
+        .sort_values()
+        .dt.strftime("%Y-%m-%d")
+        .tolist()[0]
     )
-    nearest_expiry = nearest_expiry.sort_values().dt.strftime("%Y-%m-%d").tolist()[0]
     params = {
         "i": list(
             map(
