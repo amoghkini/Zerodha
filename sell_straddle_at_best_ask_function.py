@@ -118,4 +118,4 @@ def punch_short_straddle_at_best_ask(
         ]["order_id"]
         for order_param in order_params
     ]
-    return atm_ce_best_ask, atm_pe_best_ask
+    return ce_order_id, pe_order_id
